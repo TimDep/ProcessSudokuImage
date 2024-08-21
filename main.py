@@ -20,6 +20,7 @@ if not os.path.exists(cell_image_directory):
 
 @app.route('/upload-image', methods=['POST'])
 def upload_image():
+    print("Request received")
     if 'image' not in request.files:
         return jsonify({'error': 'No image part'}), 400
 
@@ -32,7 +33,12 @@ def upload_image():
         # Save the uploaded file
         filename = 'sudoku.png'
         file.save(filename)
+        print("File saved successfully.")
         image = cv2.imread(filename)
+        if image is None:
+            print("Failed to load image.")
+        else:
+            print("Image loaded successfully.")
 
         # Process the image
         grayscale_img = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
