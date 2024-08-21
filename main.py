@@ -4,12 +4,16 @@ import pandas as pd
 from flask import Flask, request, jsonify
 import ml_digits
 import cv2
+from keras.src.saving import load_model
+
 
 app = Flask(__name__)
 
-# Make sure the directory for saving images exists
+#globals
 global cell_image_directory
+global trained_model
 
+trained_model = load_model('digits_model.keras')
 cell_image_directory = "BoardCells"
 if not os.path.exists(cell_image_directory):
     os.makedirs(cell_image_directory)
