@@ -32,27 +32,29 @@ def extractNumbersFromImage(img_grid):
             ocr_image = cv2.resize(im, (28, 28))  # Resize to the expected size
             ocr_image = cv2.bitwise_not(ocr_image)  # Invert image to match Tesseract expectations
 
-            data = pytesseract.image_to_string(ocr_image, config='--psm 10 --oem 3 -c tessedit_char_whitelist=123456789')
+            number = pytesseract.image_to_string(ocr_image, config='--psm 10 --oem 3 -c tessedit_char_whitelist=123456789')
 
+            predictions = trained_model.predict(image)
+            classIndex = np.argmax(predictions,axis=1)
+            probabilityValue = np.amax(predictions)
+            print(probabilityValue)
+            if probabilityValue > 0.65:
+                numberModel = str(classIndex[0])
+                print(numberModel)
+                print(number)
+                if numberModel in number:
+                    data = numberModel
+                else:
+                    if not number:
+                        data=""
+                    else:
+                        data = number[0]
+            elif probabilityValue < 0.25:
+                data= ""
+            else:
+                data=number
 
-            # predictions = trained_model.predict(image)
-            # classIndex = np.argmax(predictions,axis=1)
-            # probabilityValue = np.amax(predictions)
-            # print(probabilityValue)
-            #
-            # if probabilityValue>0.65:
-            #     data = classIndex[0]
-            # else:
-            #     data = ""
-
-            # OCR PYTESSERACT
-            # data = pytesseract.image_to_string(image, config='--psm 10 --oem 3 -c tessedit_char_whitelist=123456789')
-
-            #OCR KERAS // NOT WORKING
-            # pipeline = keras_ocr.pipeline.Pipeline()
-            # read_image = keras_ocr.tools.read(image)
-            # data =pipeline.recognize([read_image])
-            # print(data)
+            data = data.strip().replace("\n", "").replace("\r", "")
 
             tmp_sudoku[i][j] = data
 
