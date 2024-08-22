@@ -1,10 +1,15 @@
 import os
+
+import imutils
 import numpy as np
 import pandas as pd
 from flask import Flask, request, jsonify
+from skimage.segmentation import clear_border
+
 import ml_digits
 import cv2
 from keras.src.saving import load_model
+from PIL import Image
 
 
 app = Flask(__name__)
@@ -20,7 +25,6 @@ if not os.path.exists(cell_image_directory):
 
 @app.route('/upload-image', methods=['POST'])
 def upload_image():
-    print("Request received")
     if 'image' not in request.files:
         return jsonify({'error': 'No image part'}), 400
 
@@ -33,12 +37,7 @@ def upload_image():
         # Save the uploaded file
         filename = 'sudoku.png'
         file.save(filename)
-        print("File saved successfully.")
         image = cv2.imread(filename)
-        if image is None:
-            print("Failed to load image.")
-        else:
-            print("Image loaded successfully.")
 
         # Process the image
         grayscale_img = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -51,7 +50,12 @@ def upload_image():
         corners = findCornersRect(inverted_threshold_img)
         newimg = cropAndWarp(image, corners)
 
+        processed_image_filename = 'processed_sudoku.png'
+        cv2.imwrite(processed_image_filename, newimg)
+
         grid = extractCells(newimg)
+
+        grid = extractDigits(grid)
 
         finalgrid= ml_digits.extractNumbersFromImage(grid)
 
@@ -100,8 +104,7 @@ def distance_between(p1, p2):
 
 def extractCells(img):
     grid = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    # grid = cv2.bitwise_not(cv2.adaptiveThreshold(grid, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 101, 1))
-    # grid  = cv2.bitwise_not(grid)
+    grid = cv2.adaptiveThreshold(grid, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 101, 1)
 
     edge_h = np.shape(grid)[0]
     edge_w = np.shape(grid)[1]
@@ -122,6 +125,46 @@ def extractCells(img):
             row.append(cell)
         finalgrid.append(row)
     return finalgrid
+
+def extractDigits(grid):
+    tmp_sudoku = [[cell for cell in row] for row in grid]  # Start with the original grid
+
+    for i in range(9):
+        for j in range(9):
+            cell = grid[i][j]
+            thresh = cv2.threshold(cell, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)[1]
+            thresh = clear_border(thresh)
+
+            # Find contours in the thresholded cell
+            cnts = cv2.findContours(thresh.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            cnts = imutils.grab_contours(cnts)
+
+            if not cnts or len(cnts) == 0:  # Check if contours list is empty
+                # Set cell to fully white if no contours found
+                tmp_sudoku[i][j] = np.full_like(cell, 255)
+                continue
+
+            # Proceed with the largest contour
+            c = max(cnts, key=cv2.contourArea)
+            mask = np.zeros(thresh.shape, dtype="uint8")
+            cv2.drawContours(mask, [c], -1, 255, -1)
+            (h, w) = thresh.shape
+            percentFilled = cv2.countNonZero(mask) / float(w * h)
+
+            # Skip cells with very small contours considered as noise
+            if percentFilled < 0.03:
+                tmp_sudoku[i][j] = np.full_like(cell, 255)
+                continue
+
+            # Apply the mask to the thresholded cell to isolate the digit
+            digit = cv2.bitwise_and(thresh, thresh, mask=mask)
+            digit = cv2.bitwise_not(digit)
+            tmp_sudoku[i][j] = digit  # Store the digit image in the corresponding grid position
+
+    return tmp_sudoku
+
+
+
 
 
 if __name__ == '__main__':

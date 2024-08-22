@@ -23,20 +23,27 @@ def extractNumbersFromImage(img_grid):
 
             # digits model trained.
             img = np.asarray(image)
-            img = img[4:img.shape[0] - 4, 4:img.shape[1] - 4]
-            img = cv2.resize(img, (32, 32))
-            img = img / 255
-            image = img.reshape(1, 32, 32, 1)
+            image = img[4:img.shape[0] - 4, 4:img.shape[1] - 4]
+            image = cv2.resize(image, (32, 32))
+            image = image / 255
+            image = image.reshape(1, 32, 32, 1)
 
-            predictions = trained_model.predict(image)
-            classIndex = np.argmax(predictions,axis=1)
-            probabilityValue = np.amax(predictions)
-            print(probabilityValue)
+            # Ensure the image is in the proper format for PyTesseract
+            ocr_image = cv2.resize(im, (28, 28))  # Resize to the expected size
+            ocr_image = cv2.bitwise_not(ocr_image)  # Invert image to match Tesseract expectations
 
-            if probabilityValue>0.65:
-                data = classIndex[0]
-            else:
-                data = ""
+            data = pytesseract.image_to_string(ocr_image, config='--psm 10 --oem 3 -c tessedit_char_whitelist=123456789')
+
+
+            # predictions = trained_model.predict(image)
+            # classIndex = np.argmax(predictions,axis=1)
+            # probabilityValue = np.amax(predictions)
+            # print(probabilityValue)
+            #
+            # if probabilityValue>0.65:
+            #     data = classIndex[0]
+            # else:
+            #     data = ""
 
             # OCR PYTESSERACT
             # data = pytesseract.image_to_string(image, config='--psm 10 --oem 3 -c tessedit_char_whitelist=123456789')
